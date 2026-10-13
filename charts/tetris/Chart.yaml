@@ -1,0 +1,8 @@
+apiVersion: v2
+name: tetris
+description: Tetris three-tier application (React + Node.js + MySQL) with monitoring and security defaults
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Roudayna Kouka

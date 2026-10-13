@@ -1,0 +1,65 @@
+{{- if .Values.monitoring.serviceMonitor }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tetris-backend
+  labels: {{- include "tetris.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels: { app: tetris-backend }
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+{{- end }}
+{{- if .Values.monitoring.prometheusRule }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tetris-alerts
+  labels: {{- include "tetris.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: tetris
+      rules:
+        - alert: TetrisBackendDown
+          expr: absent(up{job="tetris-backend"} == 1)
+          for: 2m
+          labels: { severity: critical }
+          annotations:
+            summary: "Tetris backend is down"
+            description: "No healthy backend target has been scraped for 2 minutes."
+        - alert: TetrisHighErrorRate
+          expr: |
+            sum(rate(http_request_duration_seconds_count{job="tetris-backend",status=~"5.."}[5m]))
+              / sum(rate(http_request_duration_seconds_count{job="tetris-backend"}[5m])) > 0.05
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "More than 5% of API requests fail"
+        - alert: TetrisHighLatency
+          expr: |
+            histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="tetris-backend"}[5m]))) > 1
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "API p95 latency is above 1 second"
+        - alert: TetrisPodCrashLooping
+          expr: increase(kube_pod_container_status_restarts_total{pod=~"tetris-.*"}[15m]) > 3
+          labels: { severity: critical }
+          annotations:
+            summary: "Pod {{`{{ $labels.pod }}`}} is restarting repeatedly"
+{{- end }}
+{{- if .Values.monitoring.grafanaDashboard }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tetris-grafana-dashboard
+  labels:
+    grafana_dashboard: "1"
+data:
+  tetris.json: |-
+{{ .Files.Get "dashboards/tetris.json" | indent 4 }}
+{{- end }}

@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tetris-backend
+  labels: {{- include "tetris.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicas }}
+  {{- end }}
+  selector:
+    matchLabels: { app: tetris-backend }
+  template:
+    metadata:
+      labels:
+        app: tetris-backend
+        {{- include "tetris.labels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          ports:
+            - { name: http, containerPort: {{ .Values.backend.port }} }
+          env:
+            - { name: PORT, value: "{{ .Values.backend.port }}" }
+            - { name: DB_HOST, value: {{ .Values.database.host | quote }} }
+            - { name: DB_PORT, value: {{ .Values.database.port | quote }} }
+            - { name: DB_NAME, value: {{ .Values.database.name | quote }} }
+            - { name: DB_SSL, value: "true" }
+            - { name: DB_SSL_CA, value: /app/rds-ca.pem }
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.database.secretName }}, key: username }
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ .Values.database.secretName }}, key: password }
+          securityContext: {{- include "tetris.securityContext" . | nindent 12 }}
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 15
+          resources: {{- toYaml .Values.backend.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tetris-backend
+  labels:
+    app: tetris-backend
+    {{- include "tetris.labels" . | nindent 4 }}
+spec:
+  selector: { app: tetris-backend }
+  ports:
+    - { name: http, port: 3000, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: tetris-backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: tetris-backend }
+{{- if .Values.backend.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tetris-backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tetris-backend
+  minReplicas: {{ .Values.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.backend.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.backend.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

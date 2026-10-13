@@ -1,0 +1,19 @@
+{
+  "title": "Tetris Platform",
+  "uid": "tetris-platform",
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s",
+  "panels": [
+    { "id": 1, "type": "timeseries", "title": "API requests / s", "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [ { "expr": "sum by (route) (rate(http_request_duration_seconds_count{job=\"tetris-backend\"}[5m]))", "legendFormat": "{{route}}" } ] },
+    { "id": 2, "type": "timeseries", "title": "p95 latency (s)", "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [ { "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"tetris-backend\"}[5m])))", "legendFormat": "p95" } ] },
+    { "id": 3, "type": "timeseries", "title": "5xx error rate", "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [ { "expr": "sum(rate(http_request_duration_seconds_count{job=\"tetris-backend\",status=~\"5..\"}[5m]))", "legendFormat": "5xx/s" } ] },
+    { "id": 4, "type": "stat", "title": "Scores submitted", "gridPos": { "x": 12, "y": 8, "w": 6, "h": 8 },
+      "targets": [ { "expr": "sum(tetris_scores_submitted_total)" } ] },
+    { "id": 5, "type": "stat", "title": "Running pods", "gridPos": { "x": 18, "y": 8, "w": 6, "h": 8 },
+      "targets": [ { "expr": "count(kube_pod_status_phase{pod=~\"tetris-.*\",phase=\"Running\"} == 1)" } ] }
+  ]
+}

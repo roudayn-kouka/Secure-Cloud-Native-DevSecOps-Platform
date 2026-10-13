@@ -1,0 +1,52 @@
+# Image tags are updated automatically by the Jenkins pipeline (GitOps): Argo CD then syncs the change.
+frontend:
+  image:
+    repository: 123456789012.dkr.ecr.us-east-1.amazonaws.com/tetris-frontend
+    tag: "latest"
+  replicas: 2
+  port: 8080
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
+backend:
+  image:
+    repository: 123456789012.dkr.ecr.us-east-1.amazonaws.com/tetris-backend
+    tag: "latest"
+  replicas: 2
+  port: 3000
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 300m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+database:
+  host: tetris-eks-cluster-mysql.xxxxxxxx.us-east-1.rds.amazonaws.com   # terraform output rds_endpoint
+  port: 3306
+  name: tetris
+  secretName: tetris-db-credentials     # Kubernetes secret with keys: username, password
+  externalSecret:
+    enabled: true                       # sync the RDS-managed secret from AWS Secrets Manager
+    awsSecretArn: ""                    # terraform output rds_secret_arn
+    region: us-east-1
+
+ingress:
+  enabled: true
+  className: alb                        # requires the AWS Load Balancer Controller
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+  host: ""
+
+networkPolicy:
+  enabled: true
+
+monitoring:
+  serviceMonitor: true                  # needs the Prometheus Operator CRDs (kube-prometheus-stack)
+  prometheusRule: true
+  grafanaDashboard: true

@@ -1,0 +1,35 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tetris
+  labels: {{- include "tetris.labels" . | nindent 4 }}
+  annotations: {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: tetris-backend, port: { number: 3000 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: tetris-frontend, port: { number: 80 } }
+      {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host }}
+      {{- end }}
+{{- end }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: { name: tetris-backend, port: { number: 3000 } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: tetris-frontend, port: { number: 80 } }
+{{- end }}

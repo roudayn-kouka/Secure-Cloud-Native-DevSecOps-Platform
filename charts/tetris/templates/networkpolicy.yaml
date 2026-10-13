@@ -1,0 +1,36 @@
+{{- if .Values.networkPolicy.enabled }}
+# Default deny for the application pods, then open only what is needed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: tetris
+  policyTypes: ["Ingress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend
+spec:
+  podSelector:
+    matchLabels: { app: tetris-frontend }
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - port: {{ .Values.frontend.port }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend
+spec:
+  podSelector:
+    matchLabels: { app: tetris-backend }
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - port: {{ .Values.backend.port }}
+{{- end }}

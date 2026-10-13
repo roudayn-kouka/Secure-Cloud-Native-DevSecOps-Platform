@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tetris-frontend
+  labels: {{- include "tetris.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels: { app: tetris-frontend }
+  template:
+    metadata:
+      labels:
+        app: tetris-frontend
+        {{- include "tetris.labels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.frontend.port }}
+          securityContext: {{- include "tetris.securityContext" . | nindent 12 }}
+          readinessProbe:
+            httpGet: { path: /healthz, port: {{ .Values.frontend.port }} }
+          livenessProbe:
+            httpGet: { path: /healthz, port: {{ .Values.frontend.port }} }
+            initialDelaySeconds: 10
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tetris-frontend
+  labels: {{- include "tetris.labels" . | nindent 4 }}
+spec:
+  selector: { app: tetris-frontend }
+  ports:
+    - port: 80
+      targetPort: {{ .Values.frontend.port }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: tetris-frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: tetris-frontend }
