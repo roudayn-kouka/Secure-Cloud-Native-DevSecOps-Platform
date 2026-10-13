@@ -1,0 +1,8 @@
+Tetris DevSecOps Platform
+Copyright 2026 Roudayna Kouka
+
+This project is a substantially extended derivative of
+"End-to-End-Kubernetes-DevSecOps-Tetris-Project" by Aman Pathak
+(https://github.com/AmanPathak-DevOps/End-to-End-Kubernetes-DevSecOps-Tetris-Project, Apache-2.0)
+and embeds the React Tetris game by Matheus Pires Carvalho
+(https://github.com/mpirescarvalho/react-tetris, see frontend/LICENSE).

@@ -1,0 +1,30 @@
+# Local development: docker compose up --build  ->  http://localhost:8080
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: devroot
+      MYSQL_DATABASE: tetris
+      MYSQL_USER: tetris
+      MYSQL_PASSWORD: devpass
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pdevroot"]
+      interval: 5s
+      retries: 20
+  backend:
+    build: ./backend
+    environment:
+      DB_HOST: db
+      DB_USER: tetris
+      DB_PASSWORD: devpass
+      DB_NAME: tetris
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["3000:3000"]
+  frontend:
+    build: ./frontend
+    ports: ["8080:8080"]
+    volumes:
+      # local-only config that proxies /api to the backend (in Kubernetes the Ingress does this)
+      - ./frontend/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [backend]

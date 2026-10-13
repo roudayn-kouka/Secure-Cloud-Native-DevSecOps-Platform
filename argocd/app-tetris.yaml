@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tetris
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/YOUR-GITHUB-USER/tetris-devsecops-platform.git
+    targetRevision: master
+    path: charts/tetris
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tetris
+  syncPolicy:
+    automated:
+      prune: true      # delete resources removed from Git
+      selfHeal: true   # revert manual changes in the cluster
+    syncOptions:
+      - CreateNamespace=true

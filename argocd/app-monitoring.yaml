@@ -1,0 +1,56 @@
+# Prometheus + Alertmanager + Grafana (kube-prometheus-stack), deployed through GitOps.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 65.5.1
+    helm:
+      values: |
+        prometheus:
+          prometheusSpec:
+            # discover ServiceMonitors / PrometheusRules from any namespace (incl. the tetris release)
+            serviceMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            retention: 7d
+        grafana:
+          sidecar:
+            dashboards:
+              enabled: true
+              label: grafana_dashboard
+              searchNamespace: ALL
+          admin:
+            existingSecret: grafana-admin   # kubectl -n monitoring create secret generic grafana-admin --from-literal=admin-user=admin --from-literal=admin-password=<strong-password>
+            userKey: admin-user
+            passwordKey: admin-password
+        alertmanager:
+          config:
+            route:
+              receiver: default
+              group_by: [alertname, namespace]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 4h
+              routes:
+                - receiver: "null"
+                  matchers: [alertname = "Watchdog"]
+                - receiver: default
+                  matchers: [severity = "critical"]
+                  repeat_interval: 1h
+            receivers:
+              - name: "null"
+              - name: default
+                # Add a notification channel here, e.g. slack_configs / email_configs (see README, "Alerting").
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]

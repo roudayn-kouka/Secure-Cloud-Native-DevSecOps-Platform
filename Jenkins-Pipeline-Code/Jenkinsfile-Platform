@@ -1,0 +1,102 @@
+// CI pipeline: quality gate -> security scans -> build -> image scan -> push to ECR -> GitOps commit.
+// Argo CD then deploys the new image tag automatically.
+pipeline {
+    agent any
+    tools { nodejs 'nodejs' }
+    parameters {
+        string(name: 'AWS_ACCOUNT_ID', defaultValue: '123456789012', description: 'AWS account that owns the ECR repositories')
+        string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'ECR region')
+        string(name: 'GIT_REPO', defaultValue: 'YOUR-GITHUB-USER/tetris-devsecops-platform', description: 'GitHub owner/repo')
+    }
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+        ECR = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
+        TAG = "${BUILD_NUMBER}"
+    }
+    stages {
+        stage('Checkout') {
+            steps { cleanWs(); git branch: 'master', url: "https://github.com/${params.GIT_REPO}.git" }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=tetris-platform \
+                          -Dsonar.projectName=tetris-platform -Dsonar.sources=frontend/src,backend/src'''
+                }
+            }
+        }
+        stage('Quality Gate') {
+            steps { timeout(time: 5, unit: 'MINUTES') { waitForQualityGate abortPipeline: true } }
+        }
+        stage('Install & Test') {
+            parallel {
+                stage('Backend') { steps { dir('backend') { sh 'npm ci && npm test' } } }
+                stage('Frontend') { steps { dir('frontend') { sh 'npm ci' } } }
+            }
+        }
+        stage('OWASP Dependency-Check') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./frontend --scan ./backend --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+        stage('Trivy: dependencies') {
+            steps { sh 'trivy fs --severity HIGH,CRITICAL --scanners vuln,secret --format table -o trivy-fs.txt .' }
+        }
+        stage('Trivy: IaC & Helm configuration') {
+            steps {
+                // misconfigurations in Terraform and Kubernetes manifests; fail the build on CRITICAL findings
+                sh 'trivy config --severity HIGH,CRITICAL --format table -o trivy-config.txt EKS-TF charts'
+                sh 'trivy config --severity CRITICAL --exit-code 1 EKS-TF charts'
+            }
+        }
+        stage('Helm Lint') {
+            steps { sh 'helm lint charts/tetris' }
+        }
+        stage('Build Images') {
+            steps {
+                sh 'docker build -t tetris-frontend:$TAG frontend'
+                sh 'docker build -t tetris-backend:$TAG backend'
+            }
+        }
+        stage('Trivy: container images') {
+            steps {
+                // block the release when a CRITICAL vulnerability that has a fix is found
+                sh 'trivy image --severity CRITICAL --ignore-unfixed --exit-code 1 tetris-frontend:$TAG'
+                sh 'trivy image --severity CRITICAL --ignore-unfixed --exit-code 1 tetris-backend:$TAG'
+                sh 'trivy image --severity HIGH,CRITICAL -o trivy-images.txt tetris-backend:$TAG'
+            }
+        }
+        stage('Push to Amazon ECR') {
+            steps {
+                // Jenkins EC2 instance profile provides the AWS credentials
+                sh '''
+                  aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR
+                  for img in frontend backend; do
+                    docker tag tetris-$img:$TAG $ECR/tetris-$img:$TAG
+                    docker push $ECR/tetris-$img:$TAG
+                  done
+                '''
+            }
+        }
+        stage('GitOps: update image tags') {
+            steps {
+                withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+                    sh '''
+                      git config user.email "jenkins@ci.local"
+                      git config user.name "jenkins-ci"
+                      sed -i -E "/tetris-frontend/{n;s/tag: .*/tag: \\"$TAG\\"/}" charts/tetris/values.yaml
+                      sed -i -E "/tetris-backend/{n;s/tag: .*/tag: \\"$TAG\\"/}" charts/tetris/values.yaml
+                      sed -i -E "s#repository: .*/tetris-(frontend|backend)#repository: $ECR/tetris-\\1#" charts/tetris/values.yaml
+                      git add charts/tetris/values.yaml
+                      git commit -m "ci: deploy image tag $TAG [skip ci]" || exit 0
+                      git push https://${GITHUB_TOKEN}@github.com/${GIT_REPO}.git HEAD:master
+                    '''
+                }
+            }
+        }
+    }
+    post {
+        always { archiveArtifacts artifacts: 'trivy-*.txt', allowEmptyArchive: true }
+    }
+}

@@ -4,21 +4,15 @@
 
 A secure, cloud-native three-tier platform: a **React** front end, a **Node.js** leaderboard API and an encrypted **Amazon RDS for MySQL** database, deployed on **Amazon EKS** with a full **DevSecOps** pipeline and **GitOps** delivery.
 
-> Origin: this repository started from Aman Pathak's open-source Tetris/EKS tutorial (Apache-2.0). It was reworked and extended by Roudayna Kouka (see [NOTICE](NOTICE)): backend and database tier, private networking, RDS, ECR, Helm chart, new CI pipeline, security scanning, monitoring and alerting.
 
 ## Architecture
+<div align="center">
+  <img src="./public/assets/Plateforme DevSecOps Tetris sur Amazon EKS.png" alt="Logo" width="100%" height="100%">
 
-```
-Developer ──git push──> GitHub ──> Jenkins ──> SonarQube gate ─> Trivy (deps, IaC, images) ─> Amazon ECR
-                           ▲                                                                     │
-                           └──── Jenkins commits new image tag to charts/tetris/values.yaml ─────┘
-                                                          │
-                                        Argo CD (auto-sync, self-heal) pulls from Git
-                                                          ▼
- Internet ─> ALB ─┬─ /     ─> frontend (nginx, 2 pods) ─┐   Amazon EKS (private subnets, KMS-encrypted secrets)
-                  └─ /api  ─> backend  (Node.js, HPA 2-5) ──TLS──> RDS MySQL (private, KMS-encrypted, Secrets Manager)
- Prometheus ── scrapes /metrics ─> Alertmanager (alerts) + Grafana (dashboard)
-```
+</div>
+
+<br />
+
 
 ## What is in the repo
 
