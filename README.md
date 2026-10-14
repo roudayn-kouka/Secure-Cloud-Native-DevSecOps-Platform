@@ -7,7 +7,7 @@ A secure, cloud-native three-tier platform: a **React** front end, a **Node.js**
 
 ## Architecture
 <div align="center">
-  <img src="./public/assets/Plateforme DevSecOps Tetris sur Amazon EKS.png" alt="Logo" width="100%" height="100%">
+  <img src="./public/assets/Plateforme DevSecOps Tetris sur Amazon EKS.gif" alt="Logo" width="100%" height="100%">
 
 </div>
 
