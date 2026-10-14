@@ -1,4 +1,4 @@
-# Tetris DevSecOps Platform on Amazon EKS
+#  DevSecOps Platform on Amazon EKS
 
 **Author / maintainer: Roudayna Kouka**
 
