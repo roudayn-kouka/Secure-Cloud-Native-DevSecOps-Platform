@@ -1,4 +1,4 @@
-#  DevSecOps Platform on Amazon EKS
+#  Secure Cloud-Native DevSecOps Platform
 
 **Author / maintainer: Roudayna Kouka**
 
