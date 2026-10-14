@@ -40,7 +40,7 @@ The architecture emphasizes **Infrastructure as Code (IaC), shift-left security,
   <img
     src="./public/assets/Plateforme DevSecOps Tetris sur Amazon EKS.gif"
     alt="Secure Cloud-Native DevSecOps Platform Architecture"
-    width="80%"
+    width="100%"
   />
 </p>
 
